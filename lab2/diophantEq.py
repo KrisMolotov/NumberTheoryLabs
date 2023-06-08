@@ -1,111 +1,96 @@
-class DiophantSolver:
-    def __init__(self):
-        self.rows = 0
-        self.number_eqs = int(input("Введите количество уравнений: "))
-        self.number_unknowns = int(input("Введите количество неизвестных: "))
-        self.matrix = []
-        self.extra = []
-        for i in range(self.number_eqs):
-            print(f"Введите коэффициенты {i + 1}-го уравнения: ", end="")
-            line = list(map(int, input().split()))
-            if len(line) != self.number_unknowns + 1:
-                raise Exception("Incorrect matrix!")
-            self.matrix.append(line)
-        self.first_part()
-        self.second_part()
-        self.division()
-        self.return_answer()
-        self.print()
+from sympy import Matrix
 
-    def division(self):
-        for i in range(0, self.number_eqs - self.number_unknowns + 1):
-            if self.matrix[i][i] != 0:
-                k = self.matrix[i][self.number_unknowns - 1] // self.matrix[i][i]
-                self.subtract(self.number_unknowns - 1, i, k)
-            else:
-                self.rows = i
-                break
-            self.rows = i + 1
 
-    def is_zero(self, i):
-        for j in range(i + 1, self.number_unknowns - 1):
-            if self.matrix[i][j] == 0:
-                return True
-        return False
+def multiply_column_by_negative_one(matr, column_number):
+    for i in range(m.shape[0]):
+        matr[i, column_number] *= -1
 
-    def divide(self, row):
-        for i in range(row + 1, self.number_unknowns - 1):
-            d = self.matrix[row][i] // self.matrix[row][row]
-            self.subtract(i, row, d)
 
-    def subtract(self, i, j, d):
-        for k in range(self.number_eqs):
-            self.matrix[k][i] -= self.matrix[k][j] * d
+def check_current_row_for_zeros(matr, current_row):
+    cols = matr.cols
+    for k in range(current_row + 1, cols - 1):
+        if matr[current_row, k] != 0:
+            return False
+    return True
 
-    def inversion(self, i):
-        for row in self.matrix:
-            row[i] = -row[i]
 
-    def swapper(self, i, j):
-        for k in range(self.number_eqs):
-            temp = self.matrix[k][i]
-            self.matrix[k][i] = self.matrix[k][j]
-            self.matrix[k][j] = temp
+def transform_columns(matr, current_col, source_col, factor):
+    matr[:, current_col] -= matr[:, source_col] * factor
 
-    def check_minimum(self, row, k):
-        abs_row = [abs(row[i]) for i in range(k, self.number_unknowns - 1)]
-        m = 0
-        for x in abs_row:
-            if x > 0:
-                m = x
-                break
-        index = abs_row.index(m)
-        for i in range(0, len(abs_row)):
-            if 0 < abs_row[i] < m:
-                m = abs_row[i]
-                index = i
-        return index + k
 
-    def first_part(self):
-        for i in range(self.number_eqs):
-            self.matrix[i][self.number_unknowns - 1] = -self.matrix[i][self.number_unknowns - 1]
-        for i in range(self.number_unknowns - 1):
-            line = [0 for j in range(self.number_unknowns)]
-            line[i] = 1
-            self.matrix.append(line)
-        self.number_eqs += self.number_unknowns - 1
+def make_unit_matrix(size):
+    matr = Matrix.eye(size)
+    matr.row_del(size - 1)
+    return matr
 
-    def second_part(self):
-        for i in range(self.number_eqs):
-            while not self.is_zero(i):
-                index = self.check_minimum(self.matrix[i], i)
-                if self.matrix[i][index] == 0:
-                    continue
-                if self.matrix[i][index] < 0:
-                    self.inversion(index)
-                if index != i:
-                    self.swapper(i, index)
-                self.divide(i)
 
-    def return_answer(self):
-        for i in range(0, self.number_eqs - self.number_unknowns + 1):
-            if self.matrix[i][self.number_unknowns - 1] != 0:
-                raise Exception("Error!")
-        for j in range(self.rows, self.number_unknowns):
-            x = []
-            for i in range(self.number_eqs - self.number_unknowns + 1, self.number_eqs):
-                x.append(self.matrix[i][j])
-            self.extra.append(x)
+def make_negative_vector_b(matr):
+    vector_b = [-bi for bi in matr[:, -1] * -1]
+    return vector_b
 
-    def print(self):
-        n = self.number_unknowns - 1
-        s = len(self.extra)
-        for i in range(n):
-            print(self.extra[s - 1][i], end="\t")
-            for j in range(0, s - 1):
-                print(self.extra[j][i], end="\t")
-            print()
+
+def find_minimal_index(current_row):
+    make_positive_row = [abs(element) for element in current_row]
+    index_of_min = min((i for i, val in enumerate(make_positive_row) if val != 0), key=make_positive_row.__getitem__)
+    return index_of_min
+
+
+def whole_part_of_division(matr, current_row):
+    cols = matr.cols
+    for i in range(current_row + 1, cols - 1):
+        multiplier = matr[current_row, i] // matr[current_row, current_row]
+        transform_columns(matr, i, current_row, multiplier)
+
+
+def create_A_streak(matr):
+    rows = matr.rows
+    cols = matr.cols
+    matr[:, cols - 1] = make_negative_vector_b(matr)
+    matr = matr.col_join(make_unit_matrix(cols))
+    for i in range(rows):
+        while check_current_row_for_zeros(matr, i) == False:
+            min_index = find_minimal_index(matr[i, i:cols - 1]) + i
+            if matr[i, min_index] == 0:
+                continue
+            elif matr[i, min_index] < 0:
+                multiply_column_by_negative_one(matr, min_index)
+            if min_index != i:
+                temp_col = matr[:, i].copy()
+                matr[:, i] = matr[:, min_index]
+                matr[:, min_index] = temp_col
+            whole_part_of_division(matr, i)
+    return matr
+
+
+def find_solution(matr, matr_rank):
+    solution = []
+    for i in range(matr.rows - matr.cols + 1):
+        if matr[i, matr.cols - 1] == 0:
+            for j in range(matr_rank, matr.cols):
+                solution.append(matr[matr.rows - matr.cols + 1:, j].tolist())
+            return solution
+    return solution
 
 
 if __name__ == '__main__':
-    DiophantSolver()
+    with open('matrix.txt', 'r') as f:
+        matrix = [[int(num) for num in line.split()] for line in f]
+    m = Matrix(matrix)
+    print("Размерность иходной расширенной матрицы:", m.shape)
+    print("Элементы расширенной матрицы:")
+    for i in range(m.shape[0]):
+        for j in range(m.shape[1]):
+            print(m[i, j], end=' ')
+        print()
+    A_streak = create_A_streak(m)
+    matrix_rank = 0
+    for i in range(A_streak.rows - A_streak.cols + 1):
+        if A_streak[i, i] != 0:
+            d = A_streak[i, A_streak.cols - 1] // A_streak[i, i]
+            transform_columns(A_streak, A_streak.cols - 1, i, d)
+        else:
+            matrix_rank = i
+            break
+        matrix_rank = i + 1
+    print("Общее решение системы:")
+    print(find_solution(A_streak, matrix_rank))
